@@ -337,6 +337,9 @@ class OutputDevices: ObservableObject {
     }
     
     func updateSampleRate(_ sampleRate: Float64, bitDepth: Int?) {
+        if sampleRate == previousSampleRate && bitDepth == previousBitDepth {
+            return
+        }
         self.previousSampleRate = sampleRate
         self.previousBitDepth = bitDepth
         DispatchQueue.main.async { [self] in
@@ -393,7 +396,9 @@ class OutputDevices: ObservableObject {
         
         processQueue.async { [unowned self] in
             if isResume, let cachedSampleRate = self.trackAndSample[track] {
-                self.applySampleRate(cachedSampleRate, bitDepth: self.trackAndBitDepth[track])
+                if cachedSampleRate != self.previousSampleRate {
+                    self.applySampleRate(cachedSampleRate, bitDepth: self.trackAndBitDepth[track])
+                }
             } else {
                 self.switchLatestSampleRate()
             }

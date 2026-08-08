@@ -12,6 +12,14 @@ class MediaRemoteController {
     
     private let controller: MediaController
     private var restartWorkItem: DispatchWorkItem?
+    private var debounceWorkItem: DispatchWorkItem?
+    private var lastHandledPlayback: PlaybackState?
+    
+    private struct PlaybackState: Equatable {
+        let bundleId: String?
+        let trackId: String
+        let isPlaying: Bool
+    }
     
     init(outputDevices: OutputDevices) {
         
@@ -19,10 +27,20 @@ class MediaRemoteController {
         let controller = MediaController()
         self.controller = controller
         
-        controller.onTrackInfoReceived = { [weak outputDevices] trackInfo in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                guard let outputDevices else { return }
+        controller.onTrackInfoReceived = { [weak self, weak outputDevices] trackInfo in
+            self?.debounceWorkItem?.cancel()
+            let work = DispatchWorkItem { [weak self, weak outputDevices] in
+                guard let self, let outputDevices else { return }
+                
                 let bundleId = trackInfo.payload.bundleIdentifier
+                let state = PlaybackState(
+                    bundleId: bundleId,
+                    trackId: trackInfo.payload.uniqueIdentifier,
+                    isPlaying: trackInfo.payload.isPlaying ?? false
+                )
+                guard state != self.lastHandledPlayback else { return }
+                self.lastHandledPlayback = state
+                
                 let isMusic = bundleId == MusicApp.bundleIdentifier
                 
                 if !isMusic {
@@ -30,13 +48,15 @@ class MediaRemoteController {
                     return
                 }
                 
-                if trackInfo.payload.isPlaying == false {
+                if !state.isPlaying {
                     outputDevices.musicPlaybackPaused()
                     return
                 }
                 
                 outputDevices.trackDidChange(trackInfo)
             }
+            self?.debounceWorkItem = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
         }
         
         controller.onListenerTerminated = { [weak self] in
@@ -47,6 +67,7 @@ class MediaRemoteController {
     }
     
     deinit {
+        debounceWorkItem?.cancel()
         restartWorkItem?.cancel()
         controller.onListenerTerminated = nil
         controller.stopListening()
