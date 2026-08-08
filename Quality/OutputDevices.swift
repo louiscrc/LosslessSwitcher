@@ -13,7 +13,6 @@ import MediaRemoteAdapter
 
 enum MusicApp {
     static let bundleIdentifier = "com.apple.Music"
-    static let fallbackSampleRate: Float64 = 48000
 }
 
 class OutputDevices: ObservableObject {
@@ -172,7 +171,7 @@ class OutputDevices: ObservableObject {
         let defaultDevice = self.selectedOutputDevice ?? self.defaultOutputDevice
         guard let defaultDevice, let supported = defaultDevice.nominalSampleRates else { return }
         
-        let target = MusicApp.fallbackSampleRate
+        let target = Defaults.shared.fallbackSampleRateHz
         guard let nearest = supported.min(by: { abs($0 - target) < abs($1 - target) }) else { return }
         
         if self.enableBitDepthDetection,
