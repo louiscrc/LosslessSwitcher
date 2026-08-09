@@ -31,6 +31,10 @@ class MediaRemoteController {
             self?.debounceWorkItem?.cancel()
             let work = DispatchWorkItem { [weak self, weak outputDevices] in
                 guard let self, let outputDevices else { return }
+                guard let trackInfo else {
+                    outputDevices.resetToDefaultSampleRate()
+                    return
+                }
                 
                 let bundleId = trackInfo.payload.bundleIdentifier
                 let state = PlaybackState(
